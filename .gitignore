@@ -11,4 +11,12 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# Third party libs
 vendor/*
+
+# Timeslicer App local storage
+store/*
+
+# Configuration
+config/*
+!config/example.yml
