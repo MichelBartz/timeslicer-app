@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"fmt"
 	"log"
 	"time"
 )
@@ -10,35 +11,77 @@ type Slice struct {
 	activities []string
 }
 
+// Slicer interface
+type Slicer interface {
+	Create(string)
+	GetSlices() map[string]string
+}
+
+// DaySlicer represents a day sliced using an interval in minutes
 type DaySlicer struct {
 	date     time.Time
+	start    time.Time
+	end      time.Time
 	interval time.Duration
 	slices   []Slice
 	err      error
 }
 
-func NewDaySlicer() DaySlicer {
+// NewDaySlicer creates a new DaySlicer struct to interact with
+func NewDaySlicer(interval, start, end string) *DaySlicer {
 	now := time.Now()
-	return DaySlicer{
-		date: time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()),
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	startDuration, err := time.ParseDuration(start)
+	endDuration, err := time.ParseDuration(end)
+	if err != nil {
+		log.Fatal(fmt.Errorf("Cannot parse duration for start or end of timeslice: %s", err))
+	}
+	startTime := midnight.Add(startDuration)
+	endTime := midnight.Add(endDuration)
+
+	sliceInterval, err := time.ParseDuration(interval)
+	if err != nil {
+		log.Fatal(fmt.Errorf("Cannot parse duration for interval: %s", err))
+	}
+
+	return &DaySlicer{
+		start:    startTime,
+		end:      endTime,
+		interval: sliceInterval,
+		date:     now,
 	}
 }
 
-func (ds *DaySlicer) Create(interval string) {
-	var err error
-	ds.interval, err = time.ParseDuration(interval)
-	if err != nil {
-		ds.err = err
+// Create slices the day in defined interval
+func (ds *DaySlicer) Create() {
+	currentSlice := Slice{
+		startsAt: ds.start,
+	}
+	for currentSlice.startsAt.Before(ds.end) || currentSlice.startsAt.Equal(ds.end) {
+		ds.slices = append(ds.slices, currentSlice)
+		log.Printf("Slice at %s", currentSlice.String())
+		currentSlice.startsAt = currentSlice.startsAt.Add(ds.interval)
+	}
+}
+
+func (ds *DaySlicer) GetSlices() map[string]string {
+	slices := make(map[string]string)
+
+	for _, slice := range ds.slices {
+		slices[slice.String()] = slice.GetActivity()
 	}
 
-	day := time.Duration(24) * time.Hour
-	numSlices := int(day / ds.interval)
-	log.Printf("Creating %d slices", numSlices)
-	for i := 0; i < numSlices; i++ {
-		slice := Slice{
-			startsAt: ds.date.Add(time.Duration(i) * ds.interval),
-		}
-		log.Printf("Slice at %02dh%02d", slice.startsAt.Hour(), slice.startsAt.Minute())
-		ds.slices = append(ds.slices, slice)
+	return slices
+}
+
+func (s *Slice) String() string {
+	return fmt.Sprintf("%02dh%02d", s.startsAt.Hour(), s.startsAt.Minute())
+}
+
+func (s *Slice) GetActivity() string {
+	if len(s.activities) == 0 {
+		return ""
 	}
+	return s.activities[len(s.activities)-1]
 }

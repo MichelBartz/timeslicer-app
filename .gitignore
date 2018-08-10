@@ -13,10 +13,6 @@
 
 # Third party libs
 vendor/*
-
-# Timeslicer App local storage
-store/*
-
 # Configuration
 config/*
 !config/example.yml
