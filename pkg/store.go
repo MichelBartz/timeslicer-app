@@ -7,23 +7,25 @@ import (
 	"os"
 	"os/user"
 	"path"
-	"time"
 )
 
+// Store is the interface to implement the timeslicer app store
 type Store interface {
 	Connect()
 	IsConnected() bool
-	Get(t time.Time) map[string]string
+	Get(key string) map[string]string
 }
 
+// TimeSlicerStore represents the store engine for the timeslicer-app
 type TimeSlicerStore struct {
 	timeslicer  Slicer
-	connected   bool
+	Connected   bool
 	dbDir       string
 	fileHandler *os.File
 	err         error
 }
 
+// NewTimeSlicerStore creates a new store
 func NewTimeSlicerStore(slicer Slicer) (*TimeSlicerStore, error) {
 	user, err := user.Current()
 	if err != nil {
@@ -36,7 +38,7 @@ func NewTimeSlicerStore(slicer Slicer) (*TimeSlicerStore, error) {
 	}
 
 	return &TimeSlicerStore{
-		connected:  false,
+		Connected:  false,
 		dbDir:      dbDir,
 		timeslicer: slicer,
 	}, nil
@@ -46,12 +48,13 @@ func initStoreDir(homeDir string) (string, error) {
 	storeDir := path.Join(homeDir, ".config", "timeslicer")
 
 	if err := os.MkdirAll(storeDir, 0644); err != nil {
-		return "", errors.New(fmt.Sprintf("Could not access store file at %s, %s", storeDir, err))
+		return "", fmt.Errorf("Could not access store file at %s, %s", storeDir, err)
 	}
 
 	return storeDir, nil
 }
 
+// Connect creates the connection with the store disk file
 func (t *TimeSlicerStore) Connect(db string) {
 	pathToDb := path.Join(t.dbDir, fmt.Sprintf("%s.db", db))
 	file, err := os.OpenFile(pathToDb, os.O_RDWR|os.O_CREATE, 0644)
@@ -59,14 +62,11 @@ func (t *TimeSlicerStore) Connect(db string) {
 		t.err = err
 	}
 	t.fileHandler = file
-	t.connected = true
+	t.Connected = true
 }
 
-func (t *TimeSlicerStore) IsConnected() bool {
-	return t.connected
-}
-
-func (t *TimeSlicerStore) Get(day time.Time) map[string]string {
+// Get returns a key from the store
+func (t *TimeSlicerStore) Get(key string) map[string]string {
 	slices := make(map[string]string)
 
 	return slices

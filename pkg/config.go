@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// TimeslicerConfig represents the configuration for the timeslicer-app
 type TimeslicerConfig struct {
 	Port               int
 	StoreName          string
@@ -14,6 +15,7 @@ type TimeslicerConfig struct {
 	TimeslicerEnd      string
 }
 
+// GetConfig returns the configuration for the timeslicer-app
 func GetConfig() *TimeslicerConfig {
 	viper.SetDefault("env", "dev")
 	viper.SetDefault("port", 8080)
@@ -24,7 +26,7 @@ func GetConfig() *TimeslicerConfig {
 
 	err := viper.ReadInConfig()
 	if err != nil {
-		panic(fmt.Errorf("Fatal error reading config file: %s \n", err))
+		panic(fmt.Errorf("fatal error reading config file: %s", err))
 	}
 
 	return &TimeslicerConfig{

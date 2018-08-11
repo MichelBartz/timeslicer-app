@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// Slice represents a chunk of time with associated activities
 type Slice struct {
 	startsAt   time.Time
 	activities []string
@@ -65,6 +66,7 @@ func (ds *DaySlicer) Create() {
 	}
 }
 
+// GetSlices returns all the slices of the given DaySlicer
 func (ds *DaySlicer) GetSlices() map[string]string {
 	slices := make(map[string]string)
 
@@ -79,6 +81,7 @@ func (s *Slice) String() string {
 	return fmt.Sprintf("%02dh%02d", s.startsAt.Hour(), s.startsAt.Minute())
 }
 
+// GetActivity returns the activity of the given Slice
 func (s *Slice) GetActivity() string {
 	if len(s.activities) == 0 {
 		return ""
