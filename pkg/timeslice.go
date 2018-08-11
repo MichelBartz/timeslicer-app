@@ -14,7 +14,7 @@ type Slice struct {
 
 // Slicer interface
 type Slicer interface {
-	Create(string)
+	Create()
 	GetSlices() map[string]string
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -33,9 +34,18 @@ func (t *TimeSlicerWebServer) Start(config *TimeslicerConfig) {
 
 // HomeHandler serves the timeslicer-app homepage
 func (t *TimeSlicerWebServer) HomeHandler(w http.ResponseWriter, r *http.Request) {
+	now := time.Now()
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	daySlice := t.timeslicerStore.Get(midnight.String())
+	if daySlice == nil {
+		log.Printf("Creating day slice for %s", midnight.String())
+		daySlice = NewDaySlicer(t.config.TimeslicerInterval, t.config.TimeslicerStart, t.config.TimeslicerEnd)
+		daySlice.Create()
+		t.timeslicerStore.Set(midnight.String(), daySlice)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	var key string
-	json.NewEncoder(w).Encode(t.timeslicerStore.Get(key))
+	json.NewEncoder(w).Encode(daySlice.GetSlices())
 }
