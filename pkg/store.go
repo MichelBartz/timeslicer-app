@@ -18,7 +18,6 @@ type Store interface {
 
 // TimeSlicerStore represents the store engine for the timeslicer-app
 type TimeSlicerStore struct {
-	timeslicer  Slicer
 	Connected   bool
 	dbDir       string
 	fileHandler *os.File
@@ -27,7 +26,7 @@ type TimeSlicerStore struct {
 }
 
 // NewTimeSlicerStore creates a new store
-func NewTimeSlicerStore(slicer Slicer) (*TimeSlicerStore, error) {
+func NewTimeSlicerStore() (*TimeSlicerStore, error) {
 	user, err := user.Current()
 	if err != nil {
 		log.Fatal(fmt.Errorf("Failed to retrieve current user: %s", err))
@@ -41,7 +40,6 @@ func NewTimeSlicerStore(slicer Slicer) (*TimeSlicerStore, error) {
 	return &TimeSlicerStore{
 		Connected:   false,
 		dbDir:       dbDir,
-		timeslicer:  slicer,
 		memoryStore: make(map[string]*DaySlicer),
 	}, nil
 }
@@ -49,7 +47,7 @@ func NewTimeSlicerStore(slicer Slicer) (*TimeSlicerStore, error) {
 func initStoreDir(homeDir string) (string, error) {
 	storeDir := path.Join(homeDir, ".config", "timeslicer")
 
-	if err := os.MkdirAll(storeDir, 0644); err != nil {
+	if err := os.MkdirAll(storeDir, 0755); err != nil {
 		return "", fmt.Errorf("Could not access store file at %s, %s", storeDir, err)
 	}
 

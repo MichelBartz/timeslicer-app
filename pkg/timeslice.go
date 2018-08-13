@@ -25,11 +25,12 @@ type DaySlicer struct {
 	end      time.Time
 	interval time.Duration
 	slices   []Slice
+	store    Store
 	err      error
 }
 
 // NewDaySlicer creates a new DaySlicer struct to interact with
-func NewDaySlicer(interval, start, end string) *DaySlicer {
+func NewDaySlicer(store Store, interval, start, end string) *DaySlicer {
 	now := time.Now()
 	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -51,6 +52,7 @@ func NewDaySlicer(interval, start, end string) *DaySlicer {
 		end:      endTime,
 		interval: sliceInterval,
 		date:     now,
+		store:    store,
 	}
 }
 
@@ -75,6 +77,19 @@ func (ds *DaySlicer) GetSlices() map[string]string {
 	}
 
 	return slices
+}
+
+// Get a day slicer. ToDo: Investigate "model" approach in Golang
+// Ultimately I don't like this. Feels icky
+func (ds *DaySlicer) Get(day time.Time) map[string]string {
+	daySlice := ds.store.Get(day.String())
+	if daySlice == nil {
+		log.Printf("Creating day slice for %s", day.String())
+		ds.Create()
+		ds.store.Set(day.String(), daySlice)
+	}
+
+	return ds.GetSlices()
 }
 
 func (s *Slice) String() string {

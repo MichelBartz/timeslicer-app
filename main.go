@@ -11,8 +11,7 @@ func main() {
 	var config *ts.TimeslicerConfig
 	config = ts.GetConfig()
 
-	timeslicer := ts.NewDaySlicer(config.TimeslicerInterval, config.TimeslicerStart, config.TimeslicerEnd)
-	store, err := ts.NewTimeSlicerStore(timeslicer)
+	store, err := ts.NewTimeSlicerStore()
 	if err != nil {
 		log.Fatal(fmt.Errorf("Failed to initial store: %s", err))
 	}
