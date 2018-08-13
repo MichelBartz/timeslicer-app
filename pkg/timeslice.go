@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// Slices is an alias for map[string]string for code readability
+type Slices = map[string]string
+
 // Slice represents a chunk of time with associated activities
 type Slice struct {
 	startsAt   time.Time
@@ -69,8 +72,8 @@ func (ds *DaySlicer) Create() {
 }
 
 // GetSlices returns all the slices of the given DaySlicer
-func (ds *DaySlicer) GetSlices() map[string]string {
-	slices := make(map[string]string)
+func (ds *DaySlicer) GetSlices() Slices {
+	slices := make(Slices)
 
 	for _, slice := range ds.slices {
 		slices[slice.String()] = slice.GetActivity()
@@ -79,17 +82,18 @@ func (ds *DaySlicer) GetSlices() map[string]string {
 	return slices
 }
 
-// Get a day slicer. ToDo: Investigate "model" approach in Golang
-// Ultimately I don't like this. Feels icky
-func (ds *DaySlicer) Get(day time.Time) map[string]string {
-	daySlice := ds.store.Get(day.String())
-	if daySlice == nil {
+// Get Better but still icky methink.
+func (ds *DaySlicer) Get(day time.Time) Slices {
+	day = time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, day.Location())
+	slices := ds.store.Get(day.String())
+	if slices == nil {
 		log.Printf("Creating day slice for %s", day.String())
 		ds.Create()
-		ds.store.Set(day.String(), daySlice)
+		slices = ds.GetSlices()
+		ds.store.Set(day.String(), slices)
 	}
 
-	return ds.GetSlices()
+	return slices
 }
 
 func (s *Slice) String() string {

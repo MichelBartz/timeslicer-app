@@ -12,8 +12,8 @@ import (
 // Store is the interface to implement the timeslicer app store
 type Store interface {
 	Connect(string)
-	Get(string) *DaySlicer
-	Set(string, *DaySlicer)
+	Get(string) map[string]string
+	Set(string, map[string]string)
 }
 
 // TimeSlicerStore represents the store engine for the timeslicer-app
@@ -21,7 +21,7 @@ type TimeSlicerStore struct {
 	Connected   bool
 	dbDir       string
 	fileHandler *os.File
-	memoryStore map[string]*DaySlicer
+	memoryStore map[string]Slices
 	err         error
 }
 
@@ -40,7 +40,7 @@ func NewTimeSlicerStore() (*TimeSlicerStore, error) {
 	return &TimeSlicerStore{
 		Connected:   false,
 		dbDir:       dbDir,
-		memoryStore: make(map[string]*DaySlicer),
+		memoryStore: make(map[string]Slices),
 	}, nil
 }
 
@@ -66,7 +66,7 @@ func (t *TimeSlicerStore) Connect(db string) {
 }
 
 // Get returns a key from the store
-func (t *TimeSlicerStore) Get(key string) *DaySlicer {
+func (t *TimeSlicerStore) Get(key string) map[string]string {
 	if val, ok := t.memoryStore[key]; ok {
 		return val
 	}
@@ -74,6 +74,6 @@ func (t *TimeSlicerStore) Get(key string) *DaySlicer {
 }
 
 // Set creates a new entry in the store
-func (t *TimeSlicerStore) Set(key string, ts *DaySlicer) {
-	t.memoryStore[key] = ts
+func (t *TimeSlicerStore) Set(key string, slices Slices) {
+	t.memoryStore[key] = slices
 }
