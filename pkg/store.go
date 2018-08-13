@@ -7,13 +7,14 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"sync"
 )
 
 // Store is the interface to implement the timeslicer app store
 type Store interface {
 	Connect(string)
-	Get(string) map[string]string
-	Set(string, map[string]string)
+	Get(string) Slices
+	Set(string, Slices)
 }
 
 // TimeSlicerStore represents the store engine for the timeslicer-app
@@ -22,6 +23,7 @@ type TimeSlicerStore struct {
 	dbDir       string
 	fileHandler *os.File
 	memoryStore map[string]Slices
+	mux         sync.Mutex
 	err         error
 }
 
@@ -66,7 +68,7 @@ func (t *TimeSlicerStore) Connect(db string) {
 }
 
 // Get returns a key from the store
-func (t *TimeSlicerStore) Get(key string) map[string]string {
+func (t *TimeSlicerStore) Get(key string) Slices {
 	if val, ok := t.memoryStore[key]; ok {
 		return val
 	}
@@ -75,5 +77,19 @@ func (t *TimeSlicerStore) Get(key string) map[string]string {
 
 // Set creates a new entry in the store
 func (t *TimeSlicerStore) Set(key string, slices Slices) {
+	t.mux.Lock()
 	t.memoryStore[key] = slices
+	t.mux.Unlock()
+}
+
+// SetSlice sets the slice value for a given key
+func (t *TimeSlicerStore) SetSlice(key, slice, activity string) {
+	if ds, ok := t.memoryStore[key]; ok {
+		if _, ok := ds[slice]; ok {
+			ds[slice] = activity
+			t.mux.Lock()
+			t.memoryStore[key] = ds
+			t.mux.Unlock()
+		}
+	}
 }

@@ -29,11 +29,12 @@ func (t *TimeSlicerWebServer) Start(config *TimeslicerConfig) {
 	t.config = config
 
 	r := mux.NewRouter()
-	r.HandleFunc("/dayslice/{timestamp:[0-9]+}", t.DaySliceHandler)
+	r.HandleFunc("/dayslice/{timestamp:[0-9]+}", t.DaySliceHandler).Methods("GET")
+	r.HandleFunc("/slice", t.SliceHandler).Methods("POST")
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", config.Port), r))
 }
 
-// DaySliceHandler is the HTTP endpoint handler to get a given slice
+// DaySliceHandler is the GET HTTP endpoint handler for /dayslice/timestamp:[0-9]+ to retrieve slices for a given day
 func (t *TimeSlicerWebServer) DaySliceHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	response := make(map[string]interface{})
@@ -51,4 +52,10 @@ func (t *TimeSlicerWebServer) DaySliceHandler(w http.ResponseWriter, r *http.Req
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// SliceHandler is the POST HTTP endpoint handler for /slice to add a new activity on a slice
+func (t *TimeSlicerWebServer) SliceHandler(w http.ResponseWriter, r *http.Request) {
+	// ToDo: Implement details of save slice
+	// timestamp := r.FormValue("timestamp")
 }
