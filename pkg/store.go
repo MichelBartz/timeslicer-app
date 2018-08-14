@@ -12,9 +12,10 @@ import (
 
 // Store is the interface to implement the timeslicer app store
 type Store interface {
-	Connect(string)
-	Get(string) Slices
-	Set(string, Slices)
+	Connect(db string)
+	Get(key string) Slices
+	Set(key string, slices Slices)
+	SetSlice(key string, slice string, activity string) bool
 }
 
 // TimeSlicerStore represents the store engine for the timeslicer-app
@@ -83,13 +84,15 @@ func (t *TimeSlicerStore) Set(key string, slices Slices) {
 }
 
 // SetSlice sets the slice value for a given key
-func (t *TimeSlicerStore) SetSlice(key, slice, activity string) {
+func (t *TimeSlicerStore) SetSlice(key, slice, activity string) bool {
 	if ds, ok := t.memoryStore[key]; ok {
 		if _, ok := ds[slice]; ok {
 			ds[slice] = activity
 			t.mux.Lock()
+			defer t.mux.Unlock()
 			t.memoryStore[key] = ds
-			t.mux.Unlock()
+			return true
 		}
 	}
+	return false
 }

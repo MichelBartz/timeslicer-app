@@ -47,15 +47,31 @@ func (t *TimeSlicerWebServer) DaySliceHandler(w http.ResponseWriter, r *http.Req
 
 	daySlice := NewDaySlicer(t.timeslicerStore, t.config.TimeslicerInterval, t.config.TimeslicerStart, t.config.TimeslicerEnd)
 	dayTime := time.Unix(timestamp, 0)
-	response["date"] = dayTime.String()
+	response["date"] = dayTime.Format(time.ANSIC)
 	response["slices"] = daySlice.Get(dayTime)
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
 
 // SliceHandler is the POST HTTP endpoint handler for /slice to add a new activity on a slice
 func (t *TimeSlicerWebServer) SliceHandler(w http.ResponseWriter, r *http.Request) {
-	// ToDo: Implement details of save slice
-	// timestamp := r.FormValue("timestamp")
+	date := r.FormValue("date")
+	slice := r.FormValue("slice")
+	activity := r.FormValue("activity")
+
+	daySlice, err := time.Parse(time.ANSIC, date)
+	if err != nil {
+		response := make(map[string]interface{})
+		w.WriteHeader(http.StatusBadRequest)
+		response["error"] = "Invalid date provided"
+	}
+	key := TimeToKey(daySlice)
+	log.Printf("key: %s, slice: %s, activity: %s", key, slice, activity)
+	if t.timeslicerStore.SetSlice(key, slice, activity) {
+		w.WriteHeader(http.StatusCreated)
+	} else {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }

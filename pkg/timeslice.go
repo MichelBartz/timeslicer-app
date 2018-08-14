@@ -84,13 +84,13 @@ func (ds *DaySlicer) GetSlices() Slices {
 
 // Get Better but still icky methink.
 func (ds *DaySlicer) Get(day time.Time) Slices {
-	day = time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, day.Location())
-	slices := ds.store.Get(day.String())
+	key := TimeToKey(day)
+	slices := ds.store.Get(key)
 	if slices == nil {
 		log.Printf("Creating day slice for %s", day.String())
 		ds.Create()
 		slices = ds.GetSlices()
-		ds.store.Set(day.String(), slices)
+		ds.store.Set(key, slices)
 	}
 
 	return slices
@@ -98,4 +98,11 @@ func (ds *DaySlicer) Get(day time.Time) Slices {
 
 func (s *Slice) String() string {
 	return fmt.Sprintf("%02dh%02d", s.startsAt.Hour(), s.startsAt.Minute())
+}
+
+// TimeToKey transforms a given date to a useable timeslice key
+func TimeToKey(t time.Time) string {
+	date := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+
+	return date.Format(time.ANSIC)
 }
