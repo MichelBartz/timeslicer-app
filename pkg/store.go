@@ -4,6 +4,12 @@ import (
 	"sync"
 )
 
+// DbSyncMessage represents a store row to be saved to disk
+type DbSyncMessage struct {
+	pk  string
+	row Slices
+}
+
 // Store is the interface to implement the timeslicer app store
 type Store interface {
 	Get(key string) Slices
@@ -47,6 +53,11 @@ func (t *TimeSlicerStore) Set(key string, slices Slices) {
 	t.mux.Lock()
 	defer t.mux.Unlock()
 	t.memoryStore[key] = slices
+
+	t.fileStore.message <- DbSyncMessage{
+		pk:  key,
+		row: t.memoryStore[key],
+	}
 }
 
 // SetSlice sets the slice value for a given key
@@ -57,6 +68,11 @@ func (t *TimeSlicerStore) SetSlice(key, slice, activity string) bool {
 			t.mux.Lock()
 			defer t.mux.Unlock()
 			t.memoryStore[key] = ds
+
+			t.fileStore.message <- DbSyncMessage{
+				pk:  key,
+				row: t.memoryStore[key],
+			}
 			return true
 		}
 	}
