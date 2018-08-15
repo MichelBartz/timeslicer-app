@@ -79,8 +79,8 @@ func (t *TimeSlicerStore) Get(key string) Slices {
 // Set creates a new entry in the store
 func (t *TimeSlicerStore) Set(key string, slices Slices) {
 	t.mux.Lock()
+	defer t.mux.Unlock()
 	t.memoryStore[key] = slices
-	t.mux.Unlock()
 }
 
 // SetSlice sets the slice value for a given key
