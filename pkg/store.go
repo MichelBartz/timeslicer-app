@@ -1,13 +1,15 @@
 package pkg
 
 import (
+	"bytes"
+	"encoding/gob"
 	"sync"
 )
 
 // DbSyncMessage represents a store row to be saved to disk
 type DbSyncMessage struct {
 	pk  string
-	row Slices
+	row bytes.Buffer
 }
 
 // Store is the interface to implement the timeslicer app store
@@ -54,10 +56,7 @@ func (t *TimeSlicerStore) Set(key string, slices Slices) {
 	defer t.mux.Unlock()
 	t.memoryStore[key] = slices
 
-	t.fileStore.message <- DbSyncMessage{
-		pk:  key,
-		row: t.memoryStore[key],
-	}
+	syncToFs(t.fileStore, key, slices)
 }
 
 // SetSlice sets the slice value for a given key
@@ -69,12 +68,24 @@ func (t *TimeSlicerStore) SetSlice(key, slice, activity string) bool {
 			defer t.mux.Unlock()
 			t.memoryStore[key] = ds
 
-			t.fileStore.message <- DbSyncMessage{
-				pk:  key,
-				row: t.memoryStore[key],
+			if syncToFs(t.fileStore, key, ds) {
+				return true
 			}
-			return true
 		}
 	}
 	return false
+}
+
+func syncToFs(fs *FileStore, key string, row Slices) bool {
+	var rowBuf bytes.Buffer
+	enc := gob.NewEncoder(&rowBuf)
+	err := enc.Encode(row)
+	if err != nil {
+		return false
+	}
+	fs.message <- DbSyncMessage{
+		pk:  key,
+		row: rowBuf,
+	}
+	return true
 }

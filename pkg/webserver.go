@@ -68,7 +68,7 @@ func (t *TimeSlicerWebServer) SliceHandler(w http.ResponseWriter, r *http.Reques
 		response["error"] = "Invalid date provided"
 	}
 	key := TimeToKey(daySlice)
-	log.Printf("key: %s, slice: %s, activity: %s", key, slice, activity)
+	log.Printf("Received request, key: %s, slice: %s, activity: %s", key, slice, activity)
 	if t.timeslicerStore.SetSlice(key, slice, activity) {
 		w.WriteHeader(http.StatusCreated)
 	} else {
