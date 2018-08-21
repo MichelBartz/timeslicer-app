@@ -101,7 +101,7 @@ func (fs *FileStore) Connect(dbName string) {
 	for scanner.Scan() {
 		index := scanner.Text()
 		// Could probably run this concurrently so that processing massive indexes is not an issue ?
-		if len(index) != 1 {
+		if len(index) > 1 {
 			s := strings.Split(index, ",")
 			pos, err := strconv.ParseInt(s[1], 10, 64)
 			byteLen, err := strconv.ParseInt(s[1], 10, 64)
@@ -154,6 +154,10 @@ func doInsertAt(fs *FileStore, index Index, row bytes.Buffer) {
 	fs.mux.Lock()
 	defer fs.mux.Unlock()
 
+	_, err := fs.fileHandler.WriteAt(row.Bytes(), index.pos)
+	if err != nil {
+		fs.err = err
+	}
 }
 
 func addToIndex(fs *FileStore, pk string, index Index) {
