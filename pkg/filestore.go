@@ -129,12 +129,8 @@ func (fs *FileStore) DoSync() {
 	for {
 		toSync := <-fs.message
 		fmt.Printf("Saving row: %s", toSync.pk)
-		// ToDo: how do I actually operate this? Probably need some research
-		if index, ok := fs.index[toSync.pk]; ok {
-			doInsertAt(fs, index, toSync.row)
-			continue
-		}
-		// If not, append new record at end of store, update index
+		// Regardless of update or insert record we append the "new" row at the end of the file
+		// We'll update the index if it was an update
 		info, err := fs.fileHandler.Stat()
 		if err != nil {
 			log.Fatal("An error occured adding to file index", err)
@@ -144,7 +140,11 @@ func (fs *FileStore) DoSync() {
 			byteLen: toSync.row.Len(),
 		}
 		doInsertAt(fs, index, toSync.row)
-		addToIndex(fs, toSync.pk, index)
+		if oldIndex, ok := fs.index[toSync.pk]; ok {
+			updateIndex(fs, oldIndex, index)
+		} else {
+			addToIndex(fs, toSync.pk, index)
+		}
 	}
 }
 
@@ -173,6 +173,10 @@ func addToIndex(fs *FileStore, pk string, index Index) {
 	if err := fs.indexHandler.Sync(); err != nil {
 		fs.err = err
 	}
+}
+
+func updateIndex(fs *FileStore, old Index, new Index) {
+
 }
 
 func initStoreDir(homeDir string) (string, error) {
