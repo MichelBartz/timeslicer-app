@@ -45,6 +45,14 @@
   revision = "ef8a98b0bbce4a65b5aa4c368430a80ddc533168"
 
 [[projects]]
+  digest = "1:8f87141032085257c5b6929626160597ddce6328e1c3d998737d3096332caff2"
+  name = "github.com/ianlopshire/go-fixedwidth"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "b5f5b05297fca5895c0c6d9b4c8dda091b84cfd6"
+  version = "v0.2.1"
+
+[[projects]]
   digest = "1:c568d7727aa262c32bdf8a3f7db83614f7af0ed661474b24588de635c20024c7"
   name = "github.com/magiconair/properties"
   packages = ["."]
@@ -147,6 +155,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/gorilla/mux",
+    "github.com/ianlopshire/go-fixedwidth",
     "github.com/spf13/viper",
   ]
   solver-name = "gps-cdcl"

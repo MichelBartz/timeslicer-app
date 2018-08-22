@@ -1,22 +1,28 @@
 package pkg
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/user"
 	"path"
-	"strconv"
-	"strings"
 	"sync"
+
+	fixedwidth "github.com/ianlopshire/go-fixedwidth"
 )
+
+// IndexEntryLen is the byte size of an index entry,
+// this is a constant value for ease of manipulation
+const IndexEntryLen = 1234567890
 
 // Index is represent an individual index entry
 type Index struct {
-	pos     int64
-	byteLen int
+	pk         string `fixed:"1,255"`   // primary key value
+	rowPos     int64  `fixed:"256,276"` // row position in .db file
+	rowByteLen int    `fixed:"277,297"` // row byte length
+	iPos       int64  `fixed:"298,318"` // index position in .index file
 }
 
 // DbIndex represent a database primary index
@@ -35,6 +41,9 @@ type FileStore struct {
 	mux          sync.Mutex
 }
 
+// icky? Unsure if Golang is happy with "global" declaration at package level, methink not
+var storeBuilder *StoreBuilder
+
 // NewFileStore creates and returns a new FileStore type
 func NewFileStore(storeName string) *FileStore {
 	fileStore := &FileStore{}
@@ -51,6 +60,8 @@ func NewFileStore(storeName string) *FileStore {
 	fileStore.Connect(storeName)
 
 	fileStore.message = make(chan DbSyncMessage)
+
+	storeBuilder = NewStoreBuilder(fileStore)
 
 	return fileStore
 }
@@ -79,43 +90,35 @@ func (fs *FileStore) Connect(dbName string) {
 	fs.Connected = true
 	log.Print("Connected")
 
-	// Load up index file and warm up in memory index
 	pathToIndexFile := path.Join(fs.dbDir, fmt.Sprintf("%s.index", dbName))
+
+	// Open a handler to the index file for later usage
 	indexFile, err := os.OpenFile(pathToIndexFile, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		fs.err = err
 		return
 	}
 	fs.indexHandler = indexFile
-	// Index lines are formatted as such: pk,index;pk,index
-	scanner := bufio.NewScanner(fs.indexHandler)
-	onSemicolon := func(data []byte, atEOF bool) (advance int, token []byte, err error) {
-		for i := 0; i < len(data); i++ {
-			if data[i] == ';' {
-				return i + 1, data[:i], nil
-			}
-		}
-		return 0, data, bufio.ErrFinalToken
-	}
-	scanner.Split(onSemicolon)
-	for scanner.Scan() {
-		index := scanner.Text()
-		// Could probably run this concurrently so that processing massive indexes is not an issue ?
-		if len(index) > 1 {
-			s := strings.Split(index, ",")
-			pos, err := strconv.ParseInt(s[1], 10, 64)
-			byteLen, err := strconv.ParseInt(s[1], 10, 64)
-			if err != nil {
-				fs.err = err
-				return
-			}
 
-			fs.index[s[0]] = Index{
-				pos:     pos,
-				byteLen: int(byteLen),
-			}
-		}
+	// New version
+	data, err := ioutil.ReadFile(pathToIndexFile)
+	if err != nil {
+		fs.err = err
+		return
 	}
+
+	var index []Index
+	err = fixedwidth.Unmarshal(data, &index)
+	if err != nil {
+		fs.err = err
+		return
+	}
+
+	for _, entry := range index {
+		fs.index[entry.pk] = entry
+	}
+
+	// @ToDo We'll scan the index for a rebuild at startup
 
 	go fs.DoSync()
 }
@@ -128,6 +131,7 @@ func (fs *FileStore) DoSync() {
 
 	for {
 		toSync := <-fs.message
+		// Primary key should be enforced as a 255 char string maximum
 		fmt.Printf("Saving row: %s", toSync.pk)
 		// Regardless of update or insert record we append the "new" row at the end of the file
 		// We'll update the index if it was an update
@@ -136,14 +140,15 @@ func (fs *FileStore) DoSync() {
 			log.Fatal("An error occured adding to file index", err)
 		}
 		index := Index{
-			pos:     info.Size(),
-			byteLen: toSync.row.Len(),
+			pk:         toSync.pk,
+			rowPos:     info.Size(),
+			rowByteLen: toSync.row.Len(),
 		}
 		doInsertAt(fs, index, toSync.row)
 		if oldIndex, ok := fs.index[toSync.pk]; ok {
 			updateIndex(fs, oldIndex, index)
 		} else {
-			addToIndex(fs, toSync.pk, index)
+			addToIndex(fs, index)
 		}
 	}
 }
@@ -154,28 +159,46 @@ func doInsertAt(fs *FileStore, index Index, row bytes.Buffer) {
 	fs.mux.Lock()
 	defer fs.mux.Unlock()
 
-	_, err := fs.fileHandler.WriteAt(row.Bytes(), index.pos)
+	_, err := fs.fileHandler.WriteAt(row.Bytes(), index.rowPos)
 	if err != nil {
 		fs.err = err
 	}
 }
 
-func addToIndex(fs *FileStore, pk string, index Index) {
+func addToIndex(fs *FileStore, index Index) {
 	fs.mux.Lock()
 	defer fs.mux.Unlock()
-	fs.index[pk] = index
+	fs.index[index.pk] = index
 
-	indexEntry := fmt.Sprintf("%s,%d,%d;", pk, index.pos, index.byteLen)
-	if _, err := fs.indexHandler.Write([]byte(indexEntry)); err != nil {
-		log.Print(err)
+	info, err := fs.indexHandler.Stat()
+	if err != nil {
 		fs.err = err
+		return
+	}
+
+	index.iPos = info.Size()
+
+	indexEntry, err := fixedwidth.Marshal(index)
+	if err != nil {
+		fs.err = err
+		return
+	}
+	if _, err := fs.indexHandler.Write([]byte(indexEntry)); err != nil {
+		fs.err = err
+		return
 	}
 	if err := fs.indexHandler.Sync(); err != nil {
 		fs.err = err
+		return
 	}
 }
 
 func updateIndex(fs *FileStore, old Index, new Index) {
+	fs.mux.Lock()
+	defer fs.mux.Unlock()
+	fs.index[new.pk] = new
+
+	//@ToDo
 
 }
 
