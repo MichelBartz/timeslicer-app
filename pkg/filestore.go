@@ -43,9 +43,6 @@ type FileStore struct {
 	mux          sync.Mutex
 }
 
-// icky? Unsure if Golang is happy with "global" declaration at package level, methink not
-var storeBuilder *StoreBuilder
-
 // NewFileStore creates and returns a new FileStore type
 func NewFileStore(storeName string) *FileStore {
 	fileStore := &FileStore{}
@@ -62,8 +59,6 @@ func NewFileStore(storeName string) *FileStore {
 	fileStore.Connect(storeName)
 
 	fileStore.message = make(chan DbSyncMessage)
-
-	storeBuilder = NewStoreBuilder(fileStore)
 
 	return fileStore
 }
@@ -120,7 +115,7 @@ func (fs *FileStore) Connect(dbName string) {
 		fs.index[entry.Pk] = entry
 	}
 
-	// @ToDo We'll scan the index for a rebuild at startup
+	rebuildFromIndex(fs)
 
 	go fs.DoSync()
 }
@@ -184,6 +179,11 @@ func (fs *FileStore) Get(pk string) (*DbSyncMessage, error) {
 }
 
 // Internals
+
+func rebuildFromIndex(fs *FileStore) {
+	// @ToDo: Do rebuild from index
+	// Weird? Icky? Unsure
+}
 
 func doInsertAt(fs *FileStore, index Index, row *bytes.Buffer) {
 	fs.mux.Lock()
