@@ -66,7 +66,6 @@ func (ds *DaySlicer) Create() {
 	}
 	for currentSlice.startsAt.Before(ds.end) || currentSlice.startsAt.Equal(ds.end) {
 		ds.slices = append(ds.slices, currentSlice)
-		log.Printf("Slice at %s", currentSlice.String())
 		currentSlice.startsAt = currentSlice.startsAt.Add(ds.interval)
 	}
 }

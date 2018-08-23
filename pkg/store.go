@@ -6,12 +6,6 @@ import (
 	"sync"
 )
 
-// DbSyncMessage represents a store row to be saved to disk
-type DbSyncMessage struct {
-	pk  string
-	row bytes.Buffer
-}
-
 // Store is the interface to implement the timeslicer app store
 type Store interface {
 	Get(key string) Slices
@@ -85,7 +79,7 @@ func syncToFs(fs *FileStore, key string, row Slices) bool {
 	}
 	fs.message <- DbSyncMessage{
 		pk:  key,
-		row: rowBuf,
+		row: &rowBuf,
 	}
 	return true
 }

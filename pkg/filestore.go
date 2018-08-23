@@ -13,16 +13,18 @@ import (
 	fixedwidth "github.com/ianlopshire/go-fixedwidth"
 )
 
-// IndexEntryLen is the byte size of an index entry,
-// this is a constant value for ease of manipulation
-const IndexEntryLen = 1234567890
+// DbSyncMessage represents a store row to be saved to disk
+type DbSyncMessage struct {
+	pk  string
+	row *bytes.Buffer
+}
 
 // Index is represent an individual index entry
 type Index struct {
-	pk         string `fixed:"1,255"`   // primary key value
-	rowPos     int64  `fixed:"256,276"` // row position in .db file
-	rowByteLen int    `fixed:"277,297"` // row byte length
-	iPos       int64  `fixed:"298,318"` // index position in .index file
+	Pk         string `fixed:"1,255"`   // primary key value
+	RowPos     int64  `fixed:"256,276"` // row position in .db file
+	RowByteLen int    `fixed:"277,297"` // row byte length
+	IPos       int64  `fixed:"298,318"` // index position in .index file
 }
 
 // DbIndex represent a database primary index
@@ -93,7 +95,7 @@ func (fs *FileStore) Connect(dbName string) {
 	pathToIndexFile := path.Join(fs.dbDir, fmt.Sprintf("%s.index", dbName))
 
 	// Open a handler to the index file for later usage
-	indexFile, err := os.OpenFile(pathToIndexFile, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0644)
+	indexFile, err := os.OpenFile(pathToIndexFile, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		fs.err = err
 		return
@@ -115,7 +117,7 @@ func (fs *FileStore) Connect(dbName string) {
 	}
 
 	for _, entry := range index {
-		fs.index[entry.pk] = entry
+		fs.index[entry.Pk] = entry
 	}
 
 	// @ToDo We'll scan the index for a rebuild at startup
@@ -132,7 +134,7 @@ func (fs *FileStore) DoSync() {
 	for {
 		toSync := <-fs.message
 		// Primary key should be enforced as a 255 char string maximum
-		fmt.Printf("Saving row: %s", toSync.pk)
+		fmt.Printf("Saving row: %s\n", toSync.pk)
 		// Regardless of update or insert record we append the "new" row at the end of the file
 		// We'll update the index if it was an update
 		info, err := fs.fileHandler.Stat()
@@ -140,50 +142,75 @@ func (fs *FileStore) DoSync() {
 			log.Fatal("An error occured adding to file index", err)
 		}
 		index := Index{
-			pk:         toSync.pk,
-			rowPos:     info.Size(),
-			rowByteLen: toSync.row.Len(),
+			Pk:         toSync.pk,
+			RowPos:     info.Size(),
+			RowByteLen: toSync.row.Len(),
 		}
 		doInsertAt(fs, index, toSync.row)
 		if oldIndex, ok := fs.index[toSync.pk]; ok {
-			updateIndex(fs, oldIndex, index)
+			log.Printf("Performing index update at pos: %d...\n", oldIndex.IPos)
+			index.IPos = oldIndex.IPos
 		} else {
-			addToIndex(fs, index)
+			log.Print("Peforming index insert...\n")
+			info, err := fs.indexHandler.Stat()
+			if err != nil {
+				fs.err = err
+				return
+			}
+
+			index.IPos = info.Size()
 		}
+		updateIndex(fs, index)
 	}
+}
+
+// Get retrieves a record by primary key from the file store
+func (fs *FileStore) Get(pk string) (*DbSyncMessage, error) {
+	if index, ok := fs.index[pk]; ok {
+		var row = make([]byte, index.RowByteLen)
+
+		fs.mux.Lock()
+		fs.fileHandler.ReadAt(row, index.RowPos)
+		fs.mux.Unlock()
+
+		buffer := bytes.NewBuffer(row)
+		return &DbSyncMessage{
+			pk:  pk,
+			row: buffer,
+		}, nil
+	}
+
+	return &DbSyncMessage{}, fmt.Errorf("Cannot find record with primary key: %s", pk)
 }
 
 // Internals
 
-func doInsertAt(fs *FileStore, index Index, row bytes.Buffer) {
+func doInsertAt(fs *FileStore, index Index, row *bytes.Buffer) {
 	fs.mux.Lock()
 	defer fs.mux.Unlock()
 
-	_, err := fs.fileHandler.WriteAt(row.Bytes(), index.rowPos)
+	_, err := fs.fileHandler.WriteAt(row.Bytes(), index.RowPos)
 	if err != nil {
 		fs.err = err
 	}
 }
 
-func addToIndex(fs *FileStore, index Index) {
+func updateIndex(fs *FileStore, index Index) {
 	fs.mux.Lock()
 	defer fs.mux.Unlock()
-	fs.index[index.pk] = index
-
-	info, err := fs.indexHandler.Stat()
-	if err != nil {
-		fs.err = err
-		return
-	}
-
-	index.iPos = info.Size()
+	fs.index[index.Pk] = index
 
 	indexEntry, err := fixedwidth.Marshal(index)
 	if err != nil {
 		fs.err = err
 		return
 	}
-	if _, err := fs.indexHandler.Write([]byte(indexEntry)); err != nil {
+	log.Printf("Seeking at %d", index.IPos)
+	if _, err := fs.indexHandler.Seek(index.IPos, 0); err != nil {
+		fs.err = err
+		return
+	}
+	if _, err := fs.indexHandler.WriteAt([]byte(indexEntry), index.IPos); err != nil {
 		fs.err = err
 		return
 	}
@@ -191,15 +218,6 @@ func addToIndex(fs *FileStore, index Index) {
 		fs.err = err
 		return
 	}
-}
-
-func updateIndex(fs *FileStore, old Index, new Index) {
-	fs.mux.Lock()
-	defer fs.mux.Unlock()
-	fs.index[new.pk] = new
-
-	//@ToDo
-
 }
 
 func initStoreDir(homeDir string) (string, error) {
